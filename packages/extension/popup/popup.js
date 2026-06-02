@@ -14,7 +14,6 @@ document.querySelectorAll(".tab").forEach((tab) => {
   });
 });
 
-// Format seconds to readable string
 function fmtTime(seconds) {
   if (!seconds) return "0s";
   if (seconds < 60) return `${seconds}s`;
@@ -32,25 +31,28 @@ function timeAgo(ms) {
   return `${Math.round(s / 86400)}d ago`;
 }
 
-// Check backend status
+// Backend status — informational only, shows whether CLI sync is available
 async function checkBackend() {
   const el = document.getElementById("backend-status");
   try {
-    const res = await fetch(`${BACKEND_URL}/`, { signal: AbortSignal.timeout(2000) });
+    const res = await fetch(`${BACKEND_URL}/`, { signal: AbortSignal.timeout(1500) });
     if (res.ok) {
-      el.textContent = "● backend ok";
+      el.textContent = "● cli sync on";
       el.style.color = "#c8f135";
+      el.title = "Backend running — ctx resume works in terminal";
     } else {
-      el.textContent = "● backend error";
-      el.style.color = "#ff5f5f";
+      el.textContent = "● cli sync off";
+      el.style.color = "#666";
+      el.title = "Backend not running — extension works fine without it";
     }
   } catch {
-    el.textContent = "● offline";
+    el.textContent = "● cli sync off";
     el.style.color = "#666";
+    el.title = "Backend not running — extension works fine without it";
   }
 }
 
-// Load live session data
+// Load live session data from background worker
 function loadLive() {
   chrome.runtime.sendMessage({ type: "GET_CURRENT_SESSION" }, (session) => {
     if (!session) return;
@@ -62,14 +64,13 @@ function loadLive() {
     const tabList = document.getElementById("tab-list");
 
     const tabs = Object.values(session.tabs || {});
-    const blocked = (session.blockedDomains || []);
+    const blocked = session.blockedDomains || [];
     const hasActivity = tabs.length > 0;
 
     dot.classList.toggle("active", hasActivity);
 
     if (hasActivity) {
-      const startedAgo = timeAgo(session.startTime);
-      statusText.innerHTML = `<strong>Active</strong> · started ${startedAgo}`;
+      statusText.innerHTML = `<strong>Active</strong> · started ${timeAgo(session.startTime)}`;
     } else {
       statusText.innerHTML = `<span>No activity yet</span>`;
     }
@@ -77,7 +78,6 @@ function loadLive() {
     tabCount.textContent = tabs.length;
     blockedCount.textContent = blocked.length;
 
-    // Sort tabs by time spent descending
     const sorted = tabs
       .filter((t) => t.domain)
       .sort((a, b) => (b.timeSpent || 0) - (a.timeSpent || 0));
@@ -93,10 +93,9 @@ function loadLive() {
       const item = document.createElement("div");
       item.className = "tab-item";
 
-      const faviconUrl = `https://www.google.com/s2/favicons?domain=${tab.domain}&sz=32`;
       const favicon = document.createElement("img");
       favicon.className = "tab-favicon";
-      favicon.src = faviconUrl;
+      favicon.src = `https://www.google.com/s2/favicons?domain=${tab.domain}&sz=32`;
       favicon.onerror = () => {
         const placeholder = document.createElement("div");
         placeholder.className = "tab-favicon-placeholder";
@@ -129,64 +128,45 @@ function loadLive() {
   });
 }
 
-// Load sessions from backend or local storage
-async function loadSessions() {
+// Load sessions from chrome.storage.local (no backend required)
+function loadSessions() {
   const el = document.getElementById("sessions-list");
   el.innerHTML = '<div class="empty-state">Loading...</div>';
 
-  let sessions = [];
+  chrome.storage.local.get(["offlineSessions"], (result) => {
+    const sessions = (result.offlineSessions || []).slice(0, 10);
 
-  try {
-    const res = await fetch(`${BACKEND_URL}/api/sessions?limit=10`, {
-      signal: AbortSignal.timeout(3000),
-    });
-    if (res.ok) {
-      sessions = await res.json();
+    if (sessions.length === 0) {
+      el.innerHTML = '<div class="empty-state">No sessions yet. Browse a bit and save a session!</div>';
+      return;
     }
-  } catch {
-    // Try local storage fallback
-    sessions = await new Promise((resolve) => {
-      chrome.storage.local.get(["offlineSessions"], (r) =>
-        resolve((r.offlineSessions || []).slice(0, 10))
-      );
-    });
-  }
 
-  if (sessions.length === 0) {
-    el.innerHTML = '<div class="empty-state">No sessions yet.</div>';
-    return;
-  }
+    el.innerHTML = "";
+    for (const s of sessions) {
+      const startMs = s.startTime || 0;
+      const durationSec = s.duration || 0;
+      const tabCount = Object.keys(s.tabs || {}).length || 0;
+      const summary = s.summary || "Browsing session";
 
-  el.innerHTML = "";
-  for (const s of sessions) {
-    const startMs = s.start_time
-      ? s.start_time > 1e12
-        ? s.start_time
-        : s.start_time * 1000
-      : s.startTime || 0;
-    const durationSec = s.duration || 0;
-    const tabCount = s.tab_count || Object.keys(s.tabs || {}).length || 0;
-    const summary = s.summary || "Session";
-
-    const item = document.createElement("div");
-    item.className = "session-item";
-    item.innerHTML = `
-      <div class="session-meta">
-        <span>${timeAgo(startMs)}</span>
-        <span class="duration">${fmtTime(durationSec)}</span>
-      </div>
-      <div class="session-summary">${escHtml(summary.slice(0, 80))}</div>
-      <div style="color: var(--muted); font-size: 10px; margin-top: 2px;">${tabCount} tab${tabCount !== 1 ? "s" : ""}</div>
-    `;
-    el.appendChild(item);
-  }
+      const item = document.createElement("div");
+      item.className = "session-item";
+      item.innerHTML = `
+        <div class="session-meta">
+          <span>${timeAgo(startMs)}</span>
+          <span class="duration">${fmtTime(durationSec)}</span>
+        </div>
+        <div class="session-summary">${escHtml(summary.slice(0, 80))}</div>
+        <div style="color: var(--muted); font-size: 10px; margin-top: 2px;">${tabCount} tab${tabCount !== 1 ? "s" : ""}</div>
+      `;
+      el.appendChild(item);
+    }
+  });
 }
 
-// Load privacy settings
+// Privacy panel
 function loadPrivacy() {
   chrome.storage.local.get(["customBlocklist"], (result) => {
-    const list = result.customBlocklist || [];
-    renderBlocklist(list);
+    renderBlocklist(result.customBlocklist || []);
   });
 }
 
@@ -257,9 +237,7 @@ document.getElementById("btn-save").addEventListener("click", () => {
 
 document.getElementById("btn-clear").addEventListener("click", () => {
   if (!confirm("Clear current session? This cannot be undone.")) return;
-  chrome.runtime.sendMessage({ type: "SAVE_SESSION" }, () => {
-    loadLive();
-  });
+  chrome.runtime.sendMessage({ type: "SAVE_SESSION" }, () => loadLive());
 });
 
 function escHtml(str) {
@@ -274,6 +252,5 @@ function escHtml(str) {
 checkBackend();
 loadLive();
 
-// Refresh live data every 10 seconds while popup is open
 setInterval(loadLive, 10000);
-setInterval(checkBackend, 30000);
+setInterval(checkBackend, 60000);
