@@ -23,6 +23,39 @@ function createSession() {
   };
 }
 
+// Heuristic summary — pure JS, no backend required
+function generateSummary(session) {
+  const tabs = Object.values(session.tabs).filter((t) => t.domain);
+
+  const domainTime = {};
+  for (const tab of tabs) {
+    domainTime[tab.domain] = (domainTime[tab.domain] || 0) + (tab.timeSpent || 0);
+  }
+  const topDomains = Object.entries(domainTime)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([d]) => d);
+
+  const allQueries = [
+    ...(session.searchQueries || []),
+    ...tabs.map((t) => t.searchQuery).filter(Boolean),
+  ];
+  const uniqueQueries = [...new Set(allQueries)].slice(0, 3);
+
+  const topTab = tabs
+    .filter((t) => t.title && t.timeSpent)
+    .sort((a, b) => (b.timeSpent || 0) - (a.timeSpent || 0))[0];
+
+  const parts = [];
+  if (topDomains.length > 0) parts.push(`Active on: ${topDomains.join(", ")}`);
+  if (uniqueQueries.length > 0) parts.push(`Searched: ${uniqueQueries.join("; ")}`);
+  if (topTab) {
+    const m = Math.round((topTab.timeSpent || 0) / 60);
+    parts.push(`Most time on: ${topTab.title.slice(0, 40)} (${m}m)`);
+  }
+  return parts.join(" · ") || "Browsing session";
+}
+
 // Set up periodic save alarm
 chrome.alarms.create(SAVE_ALARM, { periodInMinutes: 5 });
 
@@ -32,13 +65,11 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
   const inactiveFor = Date.now() - lastActivityTime;
 
   if (inactiveFor >= INACTIVITY_THRESHOLD) {
-    // Inactive too long — save and reset
     if (hasActivity(currentSession)) {
       await saveSession(currentSession);
     }
     currentSession = createSession();
   } else if (hasActivity(currentSession)) {
-    // Active — snapshot save without resetting
     await saveSession(currentSession);
   }
 });
@@ -135,7 +166,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         currentSession = createSession();
         sendResponse({ success: true });
       });
-      return true; // async response
+      return true;
     }
 
     case "GET_CURRENT_SESSION": {
@@ -144,7 +175,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     case "GET_SESSIONS": {
-      fetchSessions().then((sessions) => sendResponse(sessions));
+      fetchLocalSessions().then((sessions) => sendResponse(sessions));
+      return true;
+    }
+
+    case "CLEAR_SESSIONS": {
+      chrome.storage.local.set({ offlineSessions: [] }, () => {
+        sendResponse({ success: true });
+      });
       return true;
     }
   }
@@ -155,50 +193,32 @@ async function saveSession(session) {
     ...session,
     endTime: session.endTime || Date.now(),
     duration: Math.round(((session.endTime || Date.now()) - session.startTime) / 1000),
+    summary: generateSummary(session),
   };
 
-  try {
-    const response = await fetch(`${BACKEND_URL}/api/sessions`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+  // Primary: save to chrome.storage.local (works without any backend)
+  await new Promise((resolve) => {
+    chrome.storage.local.get(["offlineSessions"], (result) => {
+      const sessions = result.offlineSessions || [];
+      const updated = [payload, ...sessions.filter((s) => s.id !== payload.id)].slice(
+        0,
+        MAX_LOCAL_SESSIONS
+      );
+      chrome.storage.local.set({ offlineSessions: updated }, resolve);
     });
+  });
 
-    if (response.ok) {
-      // Clear from local storage if it was saved there
-      chrome.storage.local.get(["offlineSessions"], (result) => {
-        const offline = (result.offlineSessions || []).filter(
-          (s) => s.id !== session.id
-        );
-        chrome.storage.local.set({ offlineSessions: offline });
-      });
-      return;
-    }
-  } catch {
-    // Backend unreachable — save locally
-  }
-
-  // Fallback to chrome.storage.local
-  chrome.storage.local.get(["offlineSessions"], (result) => {
-    const offline = result.offlineSessions || [];
-    const updated = [payload, ...offline.filter((s) => s.id !== payload.id)].slice(
-      0,
-      MAX_LOCAL_SESSIONS
-    );
-    chrome.storage.local.set({ offlineSessions: updated });
+  // Optional: sync to backend for CLI access (fire-and-forget, never blocks)
+  fetch(`${BACKEND_URL}/api/sessions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  }).catch(() => {
+    // Backend not running — that's fine, local storage has the data
   });
 }
 
-async function fetchSessions() {
-  try {
-    const response = await fetch(`${BACKEND_URL}/api/sessions`);
-    if (response.ok) {
-      return await response.json();
-    }
-  } catch {
-    // fall through to local
-  }
-
+function fetchLocalSessions() {
   return new Promise((resolve) => {
     chrome.storage.local.get(["offlineSessions"], (result) => {
       resolve(result.offlineSessions || []);
