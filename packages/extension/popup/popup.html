@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ctx</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap"
+    rel="stylesheet"
+  />
+  <style>
+    :root {
+      --bg: #0e0e0e;
+      --bg2: #1a1a1a;
+      --bg3: #242424;
+      --border: #2e2e2e;
+      --text: #e0e0e0;
+      --muted: #666;
+      --accent: #c8f135;
+      --red: #ff5f5f;
+      --cyan: #5fc8ff;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      width: 380px;
+      min-height: 420px;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "JetBrains Mono", monospace;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .header-logo {
+      color: var(--accent);
+      font-weight: 700;
+      font-size: 14px;
+      letter-spacing: 0.5px;
+    }
+    .header-logo span {
+      color: var(--muted);
+      font-weight: 400;
+      font-size: 11px;
+    }
+
+    /* Tabs */
+    .tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+    }
+    .tab {
+      flex: 1;
+      padding: 8px 0;
+      text-align: center;
+      cursor: pointer;
+      color: var(--muted);
+      font-size: 11px;
+      letter-spacing: 0.5px;
+      border-bottom: 2px solid transparent;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .tab:hover { color: var(--text); }
+    .tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+
+    /* Panels */
+    .panel { display: none; padding: 12px 14px; }
+    .panel.active { display: block; }
+
+    /* Status row */
+    .status-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--muted);
+      flex-shrink: 0;
+    }
+    .dot.active {
+      background: var(--accent);
+      box-shadow: 0 0 6px var(--accent);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+    .status-text { color: var(--muted); }
+    .status-text strong { color: var(--text); }
+
+    /* Stats row */
+    .stats-row {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 12px;
+      color: var(--muted);
+    }
+    .stat-val { color: var(--accent); font-weight: 700; }
+
+    /* Tab list */
+    .tab-list { margin-bottom: 8px; }
+    .tab-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .tab-item:last-child { border-bottom: none; }
+    .tab-favicon {
+      width: 14px;
+      height: 14px;
+      border-radius: 2px;
+      flex-shrink: 0;
+      object-fit: contain;
+    }
+    .tab-favicon-placeholder {
+      width: 14px;
+      height: 14px;
+      border-radius: 2px;
+      background: var(--bg3);
+      flex-shrink: 0;
+    }
+    .tab-info { flex: 1; min-width: 0; }
+    .tab-title {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: var(--text);
+    }
+    .tab-domain { color: var(--muted); font-size: 10px; }
+    .tab-time { color: var(--cyan); white-space: nowrap; flex-shrink: 0; }
+    .tab-blocked {
+      color: var(--muted);
+      font-style: italic;
+      padding: 4px 0;
+    }
+    .tab-blocked .lock { color: var(--accent); margin-right: 4px; }
+
+    /* Sessions list */
+    .session-item {
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .session-item:last-child { border-bottom: none; }
+    .session-meta {
+      display: flex;
+      justify-content: space-between;
+      color: var(--muted);
+      font-size: 10px;
+      margin-bottom: 3px;
+    }
+    .session-meta .duration { color: var(--cyan); }
+    .session-summary {
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Privacy panel */
+    .privacy-section { margin-bottom: 16px; }
+    .privacy-label {
+      color: var(--muted);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+    .blocklist-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 4px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .blocklist-item:last-child { border-bottom: none; }
+    .blocklist-domain { color: var(--text); }
+    .remove-btn {
+      background: none;
+      border: none;
+      color: var(--red);
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 11px;
+      padding: 2px 4px;
+    }
+    .remove-btn:hover { opacity: 0.7; }
+    .add-row {
+      display: flex;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .add-input {
+      flex: 1;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 12px;
+      padding: 5px 8px;
+      outline: none;
+    }
+    .add-input:focus { border-color: var(--accent); }
+    .add-input::placeholder { color: var(--muted); }
+    .add-btn {
+      background: var(--accent);
+      border: none;
+      border-radius: 3px;
+      color: #000;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 5px 10px;
+    }
+    .add-btn:hover { opacity: 0.85; }
+
+    .auto-blocked-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+    .auto-blocked-chip {
+      background: var(--bg3);
+      border-radius: 3px;
+      color: var(--muted);
+      font-size: 10px;
+      padding: 2px 6px;
+    }
+
+    /* Footer */
+    .footer {
+      display: flex;
+      gap: 8px;
+      padding: 10px 14px;
+      border-top: 1px solid var(--border);
+      margin-top: 4px;
+    }
+    .btn {
+      flex: 1;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      color: var(--text);
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 11px;
+      padding: 6px 0;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .btn:hover { background: var(--bg3); border-color: var(--muted); }
+    .btn.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #000;
+      font-weight: 700;
+    }
+    .btn.primary:hover { opacity: 0.85; }
+
+    .empty-state {
+      color: var(--muted);
+      text-align: center;
+      padding: 24px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="header-logo">ctx <span>context saver</span></div>
+    <div id="backend-status" style="color: var(--muted); font-size: 10px;">checking...</div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="live">Live</div>
+    <div class="tab" data-tab="sessions">Sessions</div>
+    <div class="tab" data-tab="privacy">Privacy</div>
+  </div>
+
+  <!-- Live Panel -->
+  <div class="panel active" id="panel-live">
+    <div class="status-row">
+      <div class="dot" id="status-dot"></div>
+      <div class="status-text" id="status-text">Loading...</div>
+    </div>
+    <div class="stats-row">
+      <div><span class="stat-val" id="tab-count">0</span> tabs</div>
+      <div><span class="stat-val" id="blocked-count">0</span> blocked</div>
+    </div>
+    <div class="tab-list" id="tab-list">
+      <div class="empty-state">No tabs tracked yet.</div>
+    </div>
+  </div>
+
+  <!-- Sessions Panel -->
+  <div class="panel" id="panel-sessions">
+    <div id="sessions-list">
+      <div class="empty-state">Loading sessions...</div>
+    </div>
+  </div>
+
+  <!-- Privacy Panel -->
+  <div class="panel" id="panel-privacy">
+    <div class="privacy-section">
+      <div class="privacy-label">Custom Blocklist</div>
+      <div id="custom-blocklist"></div>
+      <div class="add-row">
+        <input class="add-input" id="blocklist-input" type="text" placeholder="example.com" />
+        <button class="add-btn" id="blocklist-add">Add</button>
+      </div>
+    </div>
+    <div class="privacy-section">
+      <div class="privacy-label">Auto-blocked Categories</div>
+      <div style="color: var(--muted); font-size: 11px; margin-bottom: 6px; line-height: 1.6;">
+        Login/auth pages · Checkout &amp; payment pages · Password fields · Banking sites
+      </div>
+      <div class="auto-blocked-list">
+        <span class="auto-blocked-chip">paypal.com</span>
+        <span class="auto-blocked-chip">stripe.com</span>
+        <span class="auto-blocked-chip">chase.com</span>
+        <span class="auto-blocked-chip">bankofamerica.com</span>
+        <span class="auto-blocked-chip">mail.google.com</span>
+        <span class="auto-blocked-chip">outlook.live.com</span>
+        <span class="auto-blocked-chip">+ more</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <button class="btn" id="btn-clear">Clear</button>
+    <button class="btn primary" id="btn-save">Save Session</button>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
