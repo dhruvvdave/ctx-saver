@@ -185,6 +185,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       });
       return true;
     }
+
+    case "DISCARD_SESSION": {
+      // Reset current session without saving it
+      currentSession = createSession();
+      sendResponse({ success: true });
+      break;
+    }
   }
 });
 
