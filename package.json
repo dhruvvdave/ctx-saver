@@ -1,6 +1,7 @@
 {
   "name": "ctx-saver",
   "version": "1.0.0",
+  "license": "MIT",
   "private": true,
   "workspaces": [
     "packages/*"
@@ -8,6 +9,17 @@
   "scripts": {
     "backend": "npm run dev --workspace=packages/backend",
     "cli": "npm run build --workspace=packages/cli",
-    "build": "npm run build --workspaces"
+    "build": "npm run build --workspaces",
+    "test:e2e": "./test/e2e/run.sh",
+    "zip": "./store/build-zip.sh"
+  },
+  "description": "ctx — a local-only browser session tracker: Chrome MV3 extension, optional local backend and CLI.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dhruvvdave/ctx-saver.git"
+  },
+  "author": "Dhruv Dave",
+  "devDependencies": {
+    "playwright": "^1.56.1"
   }
 }

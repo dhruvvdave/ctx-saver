@@ -4,3 +4,7 @@ dist/
 *.db-shm
 *.db-wal
 .env
+
+# e2e test artifacts
+test/e2e/.profiles/
+store/*.zip
