@@ -1,6 +1,7 @@
 {
   "name": "@ctx/backend",
   "version": "1.0.0",
+  "license": "MIT",
   "private": true,
   "type": "module",
   "scripts": {

@@ -1,18 +1,17 @@
 {
   "manifest_version": 3,
   "name": "ctx — context saver",
-  "version": "1.0.0",
-  "description": "Silently tracks your browser sessions so you can resume exactly where you left off.",
+  "version": "1.0.1",
+  "description": "Silently tracks your browser sessions on your own machine so you can resume exactly where you left off.",
+  "minimum_chrome_version": "111",
   "permissions": [
-    "tabs",
     "storage",
     "alarms",
-    "scripting",
-    "activeTab",
     "unlimitedStorage"
   ],
   "host_permissions": [
-    "<all_urls>"
+    "http://localhost:7331/*",
+    "http://127.0.0.1:7331/*"
   ],
   "background": {
     "service_worker": "background.js",
@@ -20,14 +19,15 @@
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["content.js"],
-      "run_at": "document_idle"
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["privacy-rules.js", "content.js"],
+      "run_at": "document_idle",
+      "all_frames": false
     }
   ],
   "action": {
     "default_popup": "popup/popup.html",
-    "default_title": "ctx"
+    "default_title": "ctx — context saver"
   },
   "icons": {
     "16": "icons/icon16.png",

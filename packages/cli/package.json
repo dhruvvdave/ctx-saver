@@ -1,7 +1,9 @@
 {
   "name": "@ctx/cli",
   "version": "1.0.0",
+  "license": "MIT",
   "description": "ctx — context saver CLI",
+  "type": "module",
   "bin": {
     "ctx": "./dist/index.js"
   },
